@@ -3,101 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <title>Kerala Bus Mini Simulator</title>
-
 <style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #111;
-  color: white;
-  text-align: center;
-}
-
-header {
-  padding: 20px;
-  background: #000;
-  font-size: 24px;
-  font-weight: bold;
-}
-
-button {
-  padding: 10px 20px;
-  margin-top: 10px;
-  cursor: pointer;
-}
-
-canvas {
-  background: #444;
-  border: 3px solid white;
-  margin-top: 20px;
-}
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #222;
+    color: white;
+    text-align: center;
+    overflow: hidden;
+  }
+  header {
+    padding: 15px;
+    background: #d32f2f; /* Kerala Bus Red */
+    font-size: 28px;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  }
+  .controls { margin: 10px; color: #aaa; font-size: 14px; }
+  button {
+    padding: 12px 25px;
+    font-size: 16px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  button:hover { background: #b71c1c; }
+  canvas {
+    background: #333;
+    border: 4px solid #555;
+    display: block;
+    margin: 20px auto;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  }
+  #ui { font-size: 20px; font-weight: bold; }
 </style>
 </head>
-
 <body>
 
-<header>🚀 Trideva Interactive</header>
+<header>🚌 KERALA MOTORS</header>
+<div class="controls">Use ← LEFT and RIGHT → keys</div>
 
-<h2>Kerala Bus Mini Simulator</h2>
-<p>Use ← → keys to move</p>
-
-<button onclick="startGame()">Play Game</button>
+<div id="menu">
+  <button onclick="startGame()">Start Engine</button>
+</div>
 
 <div id="gameArea" style="display:none;">
+  <div id="ui">Score: <span id="score">0</span></div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
-  <p>Score: <span id="score">0</span></p>
-  <button onclick="restartGame()">Restart</button>
+  <button id="restartBtn" onclick="restartGame()" style="display:none;">Try Again</button>
 </div>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const scoreEl = document.getElementById("score");
+const restartBtn = document.getElementById("restartBtn");
 
-let bus = { x: 180, y: 500, width: 40, height: 80, speed: 5 };
+let bus = { x: 180, y: 480, width: 45, height: 90, speed: 4 };
 let traffic = [];
 let score = 0;
 let gameOver = false;
+let animationId;
+let roadOffset = 0;
+let keys = {};
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowLeft") bus.x -= bus.speed;
-  if (e.key === "ArrowRight") bus.x += bus.speed;
-});
+// Handle Input
+document.addEventListener("keydown", (e) => keys[e.key] = true);
+document.addEventListener("keyup", (e) => keys[e.key] = false);
 
 function spawnTraffic() {
-  let x = Math.random() * (canvas.width - 40);
-  traffic.push({ x: x, y: -80, width: 40, height: 80 });
+  if (gameOver) return;
+  let x = Math.random() * (canvas.width - 50);
+  traffic.push({ x: x, y: -100, width: 40, height: 80, color: '#2ecc71' });
+  // Slower spawn rate for a more "chilled" experience
+  setTimeout(spawnTraffic, 2000); 
 }
 
 function drawBus() {
-  ctx.fillStyle = "yellow";
+  // Main Body (Red)
+  ctx.fillStyle = "#d32f2f";
   ctx.fillRect(bus.x, bus.y, bus.width, bus.height);
+  // Roof Detail (White)
+  ctx.fillStyle = "white";
+  ctx.fillRect(bus.x + 5, bus.y + 10, bus.width - 10, 20);
+  // Windows
+  ctx.fillStyle = "#333";
+  ctx.fillRect(bus.x + 8, bus.y + 15, bus.width - 16, 10);
 }
 
 function drawTraffic() {
-  ctx.fillStyle = "red";
-  traffic.forEach(car => ctx.fillRect(car.x, car.y, car.width, car.height));
+  traffic.forEach(car => {
+    ctx.fillStyle = "#555"; // Car color
+    ctx.fillRect(car.x, car.y, car.width, car.height);
+    // Headlights
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(car.x + 5, car.y + car.height - 5, 8, 5);
+    ctx.fillRect(car.x + car.width - 13, car.y + car.height - 5, 8, 5);
+  });
 }
 
-function updateTraffic() {
-  traffic.forEach(car => {
-    car.y += 4;
+function update() {
+  if (gameOver) return;
 
+  // Smooth Movement
+  if (keys["ArrowLeft"] && bus.x > 0) bus.x -= bus.speed;
+  if (keys["ArrowRight"] && bus.x < canvas.width - bus.width) bus.x += bus.speed;
+
+  // Road Animation
+  roadOffset += 3;
+  if (roadOffset > 35) roadOffset = 0;
+
+  // Traffic movement
+  traffic.forEach((car, index) => {
+    car.y += 3; // Slower traffic speed
+
+    // Collision Detection
     if (
       bus.x < car.x + car.width &&
       bus.x + bus.width > car.x &&
       bus.y < car.y + car.height &&
       bus.y + bus.height > car.y
     ) {
-      gameOver = true;
+      endGame();
     }
   });
 
+  // Clean up off-screen cars
   traffic = traffic.filter(car => car.y < canvas.height);
+
+  score++;
+  scoreEl.innerText = Math.floor(score / 10);
 }
 
 function drawRoad() {
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
   ctx.strokeStyle = "white";
   ctx.setLineDash([20, 15]);
+  ctx.lineDashOffset = -roadOffset;
   ctx.beginPath();
   ctx.moveTo(200, 0);
   ctx.lineTo(200, 600);
@@ -105,38 +152,40 @@ function drawRoad() {
 }
 
 function gameLoop() {
-  if (gameOver) {
-    ctx.fillStyle = "white";
-    ctx.font = "30px Arial";
-    ctx.fillText("GAME OVER", 110, 300);
-    return;
-  }
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   drawRoad();
   drawBus();
   drawTraffic();
-  updateTraffic();
-
-  score++;
-  document.getElementById("score").innerText = score;
-
-  requestAnimationFrame(gameLoop);
+  update();
+  animationId = requestAnimationFrame(gameLoop);
 }
 
-setInterval(spawnTraffic, 1500);
+function startGame() {
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("gameArea").style.display = "block";
+  restartGame();
+}
+
+function endGame() {
+  gameOver = true;
+  cancelAnimationFrame(animationId);
+  restartBtn.style.display = "inline-block";
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0,0, canvas.width, canvas.height);
+  ctx.fillStyle = "white";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("ACCIDENT!", 120, 300);
+}
 
 function restartGame() {
+  // Clear any existing loops
+  cancelAnimationFrame(animationId);
   traffic = [];
   score = 0;
   gameOver = false;
   bus.x = 180;
-  gameLoop();
-}
-
-function startGame() {
-  document.getElementById("gameArea").style.display = "block";
+  restartBtn.style.display = "none";
+  spawnTraffic(); // Restart spawning
   gameLoop();
 }
 </script>
